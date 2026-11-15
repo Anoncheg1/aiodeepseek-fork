@@ -1,18 +1,11 @@
-// #include <pybind11/pybind11.h>
+#include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <immintrin.h>
 #include <string>
-#include <atomic>
 #include <thread>
 #include <vector>
-#include <algorithm>
-// #include <immintrin.h>
-#if defined(__x86_64__) || defined(_M_X64)
-#  include <immintrin.h>
-#  define POW_HAVE_AVX2 1
-#endif
-
-// namespace py = pybind11;
 
 static constexpr size_t RATE = 136;
 static constexpr size_t RATE_W = RATE / 8;
@@ -125,85 +118,85 @@ static PowCtx build_ctx(const std::string& base, const std::string& hex) {
 }
 
 #define R4(x, n) _mm256_or_si256(_mm256_slli_epi64((x), (n)), _mm256_srli_epi64((x), 64-(n)))
+#define KF_ROUND4(i)                                                                             \
+    do {                                                                                         \
+        C[0] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                              \
+                   _mm256_xor_si256(A[ 0], A[ 5]), A[10]), A[15]), A[20]);                      \
+        C[1] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                              \
+                   _mm256_xor_si256(A[ 1], A[ 6]), A[11]), A[16]), A[21]);                      \
+        C[2] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                              \
+                   _mm256_xor_si256(A[ 2], A[ 7]), A[12]), A[17]), A[22]);                      \
+        C[3] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                              \
+                   _mm256_xor_si256(A[ 3], A[ 8]), A[13]), A[18]), A[23]);                      \
+        C[4] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                              \
+                   _mm256_xor_si256(A[ 4], A[ 9]), A[14]), A[19]), A[24]);                      \
+        D[0] = _mm256_xor_si256(C[4], R4(C[1], 1));                                             \
+        D[1] = _mm256_xor_si256(C[0], R4(C[2], 1));                                             \
+        D[2] = _mm256_xor_si256(C[1], R4(C[3], 1));                                             \
+        D[3] = _mm256_xor_si256(C[2], R4(C[4], 1));                                             \
+        D[4] = _mm256_xor_si256(C[3], R4(C[0], 1));                                             \
+        for (int _j = 0; _j < 25; ++_j) A[_j] = _mm256_xor_si256(A[_j], D[_j % 5]);             \
+        B[ 0] = A[ 0];                                                                          \
+        B[ 1] = R4(A[ 6], 44);                                                                  \
+        B[ 2] = R4(A[12], 43);                                                                  \
+        B[ 3] = R4(A[18], 21);                                                                  \
+        B[ 4] = R4(A[24], 14);                                                                  \
+        B[ 5] = R4(A[ 3], 28);                                                                  \
+        B[ 6] = R4(A[ 9], 20);                                                                  \
+        B[ 7] = R4(A[10],  3);                                                                  \
+        B[ 8] = R4(A[16], 45);                                                                  \
+        B[ 9] = R4(A[22], 61);                                                                  \
+        B[10] = R4(A[ 1],  1);                                                                  \
+        B[11] = R4(A[ 7],  6);                                                                  \
+        B[12] = R4(A[13], 25);                                                                  \
+        B[13] = R4(A[19],  8);                                                                  \
+        B[14] = R4(A[20], 18);                                                                  \
+        B[15] = R4(A[ 4], 27);                                                                  \
+        B[16] = R4(A[ 5], 36);                                                                  \
+        B[17] = R4(A[11], 10);                                                                  \
+        B[18] = R4(A[17], 15);                                                                  \
+        B[19] = R4(A[23], 56);                                                                  \
+        B[20] = R4(A[ 2], 62);                                                                  \
+        B[21] = R4(A[ 8], 55);                                                                  \
+        B[22] = R4(A[14], 39);                                                                  \
+        B[23] = R4(A[15], 41);                                                                  \
+        B[24] = R4(A[21],  2);                                                                  \
+        A[ 0] = _mm256_xor_si256(B[ 0], _mm256_andnot_si256(B[ 1], B[ 2]));                     \
+        A[ 1] = _mm256_xor_si256(B[ 1], _mm256_andnot_si256(B[ 2], B[ 3]));                     \
+        A[ 2] = _mm256_xor_si256(B[ 2], _mm256_andnot_si256(B[ 3], B[ 4]));                     \
+        A[ 3] = _mm256_xor_si256(B[ 3], _mm256_andnot_si256(B[ 4], B[ 0]));                     \
+        A[ 4] = _mm256_xor_si256(B[ 4], _mm256_andnot_si256(B[ 0], B[ 1]));                     \
+        A[ 5] = _mm256_xor_si256(B[ 5], _mm256_andnot_si256(B[ 6], B[ 7]));                     \
+        A[ 6] = _mm256_xor_si256(B[ 6], _mm256_andnot_si256(B[ 7], B[ 8]));                     \
+        A[ 7] = _mm256_xor_si256(B[ 7], _mm256_andnot_si256(B[ 8], B[ 9]));                     \
+        A[ 8] = _mm256_xor_si256(B[ 8], _mm256_andnot_si256(B[ 9], B[ 5]));                     \
+        A[ 9] = _mm256_xor_si256(B[ 9], _mm256_andnot_si256(B[ 5], B[ 6]));                     \
+        A[10] = _mm256_xor_si256(B[10], _mm256_andnot_si256(B[11], B[12]));                     \
+        A[11] = _mm256_xor_si256(B[11], _mm256_andnot_si256(B[12], B[13]));                     \
+        A[12] = _mm256_xor_si256(B[12], _mm256_andnot_si256(B[13], B[14]));                     \
+        A[13] = _mm256_xor_si256(B[13], _mm256_andnot_si256(B[14], B[10]));                     \
+        A[14] = _mm256_xor_si256(B[14], _mm256_andnot_si256(B[10], B[11]));                     \
+        A[15] = _mm256_xor_si256(B[15], _mm256_andnot_si256(B[16], B[17]));                     \
+        A[16] = _mm256_xor_si256(B[16], _mm256_andnot_si256(B[17], B[18]));                     \
+        A[17] = _mm256_xor_si256(B[17], _mm256_andnot_si256(B[18], B[19]));                     \
+        A[18] = _mm256_xor_si256(B[18], _mm256_andnot_si256(B[19], B[15]));                     \
+        A[19] = _mm256_xor_si256(B[19], _mm256_andnot_si256(B[15], B[16]));                     \
+        A[20] = _mm256_xor_si256(B[20], _mm256_andnot_si256(B[21], B[22]));                     \
+        A[21] = _mm256_xor_si256(B[21], _mm256_andnot_si256(B[22], B[23]));                     \
+        A[22] = _mm256_xor_si256(B[22], _mm256_andnot_si256(B[23], B[24]));                     \
+        A[23] = _mm256_xor_si256(B[23], _mm256_andnot_si256(B[24], B[20]));                     \
+        A[24] = _mm256_xor_si256(B[24], _mm256_andnot_si256(B[20], B[21]));                     \
+        A[0] = _mm256_xor_si256(A[0], _mm256_set1_epi64x(static_cast<int64_t>(RC[i])));         \
+    } while (0)
 
-#define KF_ROUND4(i)                                                                                \
-    do {                                                                                            \
-        C[0] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                                 \
-                   _mm256_xor_si256(A[ 0], A[ 5]), A[10]), A[15]), A[20]);                         \
-        C[1] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                                 \
-                   _mm256_xor_si256(A[ 1], A[ 6]), A[11]), A[16]), A[21]);                         \
-        C[2] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                                 \
-                   _mm256_xor_si256(A[ 2], A[ 7]), A[12]), A[17]), A[22]);                         \
-        C[3] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                                 \
-                   _mm256_xor_si256(A[ 3], A[ 8]), A[13]), A[18]), A[23]);                         \
-        C[4] = _mm256_xor_si256(_mm256_xor_si256(_mm256_xor_si256(                                 \
-                   _mm256_xor_si256(A[ 4], A[ 9]), A[14]), A[19]), A[24]);                         \
-        D[0] = _mm256_xor_si256(C[4], R4(C[1], 1));                                                \
-        D[1] = _mm256_xor_si256(C[0], R4(C[2], 1));                                                \
-        D[2] = _mm256_xor_si256(C[1], R4(C[3], 1));                                                \
-        D[3] = _mm256_xor_si256(C[2], R4(C[4], 1));                                                \
-        D[4] = _mm256_xor_si256(C[3], R4(C[0], 1));                                                \
-        for (int _j = 0; _j < 25; ++_j) A[_j] = _mm256_xor_si256(A[_j], D[_j % 5]);              \
-        B[0] = A[ 0];                                                                       \
-        B[1] = R4(A[ 6], 44);                                                                     \
-        B[2] = R4(A[12], 43);                                                                     \
-        B[3] = R4(A[18], 21);                                                                     \
-        B[4] = R4(A[24], 14);                                                                     \
-        B[5] = R4(A[ 3], 28);                                                                     \
-        B[6] = R4(A[ 9], 20);                                                                     \
-        B[7] = R4(A[10], 3);                                                                     \
-        B[8] = R4(A[16], 45);                                                                     \
-        B[9] = R4(A[22], 61);                                                                     \
-        B[10] = R4(A[ 1], 1);                                                                     \
-        B[11] = R4(A[ 7], 6);                                                                     \
-        B[12] = R4(A[13], 25);                                                                     \
-        B[13] = R4(A[19], 8);                                                                     \
-        B[14] = R4(A[20], 18);                                                                     \
-        B[15] = R4(A[ 4], 27);                                                                     \
-        B[16] = R4(A[ 5], 36);                                                                     \
-        B[17] = R4(A[11], 10);                                                                     \
-        B[18] = R4(A[17], 15);                                                                     \
-        B[19] = R4(A[23], 56);                                                                     \
-        B[20] = R4(A[ 2], 62);                                                                     \
-        B[21] = R4(A[ 8], 55);                                                                     \
-        B[22] = R4(A[14], 39);                                                                     \
-        B[23] = R4(A[15], 41);                                                                     \
-        B[24] = R4(A[21], 2);                                                                     \
-        A[0] = _mm256_xor_si256(B[ 0], _mm256_andnot_si256(B[ 1], B[ 2])); \
-        A[1] = _mm256_xor_si256(B[ 1], _mm256_andnot_si256(B[ 2], B[ 3])); \
-        A[2] = _mm256_xor_si256(B[ 2], _mm256_andnot_si256(B[ 3], B[ 4])); \
-        A[3] = _mm256_xor_si256(B[ 3], _mm256_andnot_si256(B[ 4], B[ 0])); \
-        A[4] = _mm256_xor_si256(B[ 4], _mm256_andnot_si256(B[ 0], B[ 1])); \
-        A[5] = _mm256_xor_si256(B[ 5], _mm256_andnot_si256(B[ 6], B[ 7])); \
-        A[6] = _mm256_xor_si256(B[ 6], _mm256_andnot_si256(B[ 7], B[ 8])); \
-        A[7] = _mm256_xor_si256(B[ 7], _mm256_andnot_si256(B[ 8], B[ 9])); \
-        A[8] = _mm256_xor_si256(B[ 8], _mm256_andnot_si256(B[ 9], B[ 5])); \
-        A[9] = _mm256_xor_si256(B[ 9], _mm256_andnot_si256(B[ 5], B[ 6])); \
-        A[10] = _mm256_xor_si256(B[10], _mm256_andnot_si256(B[11], B[12])); \
-        A[11] = _mm256_xor_si256(B[11], _mm256_andnot_si256(B[12], B[13])); \
-        A[12] = _mm256_xor_si256(B[12], _mm256_andnot_si256(B[13], B[14])); \
-        A[13] = _mm256_xor_si256(B[13], _mm256_andnot_si256(B[14], B[10])); \
-        A[14] = _mm256_xor_si256(B[14], _mm256_andnot_si256(B[10], B[11])); \
-        A[15] = _mm256_xor_si256(B[15], _mm256_andnot_si256(B[16], B[17])); \
-        A[16] = _mm256_xor_si256(B[16], _mm256_andnot_si256(B[17], B[18])); \
-        A[17] = _mm256_xor_si256(B[17], _mm256_andnot_si256(B[18], B[19])); \
-        A[18] = _mm256_xor_si256(B[18], _mm256_andnot_si256(B[19], B[15])); \
-        A[19] = _mm256_xor_si256(B[19], _mm256_andnot_si256(B[15], B[16])); \
-        A[20] = _mm256_xor_si256(B[20], _mm256_andnot_si256(B[21], B[22])); \
-        A[21] = _mm256_xor_si256(B[21], _mm256_andnot_si256(B[22], B[23])); \
-        A[22] = _mm256_xor_si256(B[22], _mm256_andnot_si256(B[23], B[24])); \
-        A[23] = _mm256_xor_si256(B[23], _mm256_andnot_si256(B[24], B[20])); \
-        A[24] = _mm256_xor_si256(B[24], _mm256_andnot_si256(B[20], B[21])); \
-        A[0] = _mm256_xor_si256(                                                             \
-                   A[0],                                                                     \
-                   _mm256_set1_epi64x(static_cast<int64_t>(RC[i])));                         \
-    } while(0)
-
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+__attribute__((target("avx2")))
+#endif
 static void keccak_f_4way(__m256i A[25]) {
     __m256i C[5], D[5], B[25];
-    KF_ROUND4( 1); KF_ROUND4( 2); KF_ROUND4( 3); KF_ROUND4( 4);
-    KF_ROUND4( 5); KF_ROUND4( 6); KF_ROUND4( 7); KF_ROUND4( 8);
-    KF_ROUND4( 9); KF_ROUND4(10); KF_ROUND4(11); KF_ROUND4(12);
+    KF_ROUND4(1); KF_ROUND4(2); KF_ROUND4(3); KF_ROUND4(4);
+    KF_ROUND4(5); KF_ROUND4(6); KF_ROUND4(7); KF_ROUND4(8);
+    KF_ROUND4(9); KF_ROUND4(10); KF_ROUND4(11); KF_ROUND4(12);
     KF_ROUND4(13); KF_ROUND4(14); KF_ROUND4(15); KF_ROUND4(16);
     KF_ROUND4(17); KF_ROUND4(18); KF_ROUND4(19); KF_ROUND4(20);
     KF_ROUND4(21); KF_ROUND4(22); KF_ROUND4(23);
@@ -212,8 +205,11 @@ static void keccak_f_4way(__m256i A[25]) {
 #undef KF_ROUND4
 #undef R4
 
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+__attribute__((target("avx2")))
+#endif
 static void worker_avx2(const PowCtx& ctx, uint64_t from, uint64_t to,
-                         std::atomic<int64_t>& result) {
+                      std::atomic<int64_t>& result) {
     const __m256i t0 = _mm256_set1_epi64x(static_cast<int64_t>(ctx.target4[0]));
     const __m256i t1 = _mm256_set1_epi64x(static_cast<int64_t>(ctx.target4[1]));
     const __m256i t2 = _mm256_set1_epi64x(static_cast<int64_t>(ctx.target4[2]));
@@ -275,15 +271,18 @@ static void worker_avx2(const PowCtx& ctx, uint64_t from, uint64_t to,
             if (mask & (1 << l)) {
                 int64_t expected = -1;
                 result.compare_exchange_strong(expected, static_cast<int64_t>(nonce) + l,
-                                               std::memory_order_relaxed);
+                                             std::memory_order_relaxed);
                 return;
             }
         }
     }
 }
 
-static int64_t solve(const std::string& base, const std::string& challenge_hex,
-                     int64_t difficulty) {
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+__attribute__((target("avx2")))
+#endif
+static int64_t solve_impl(const std::string& base, const std::string& challenge_hex,
+                        int64_t difficulty) {
     if (challenge_hex.size() != 64 || difficulty <= 0 ||
         base.size() > RATE - MAX_NONCE_DEC)
         return -1;
@@ -314,48 +313,26 @@ static int64_t solve(const std::string& base, const std::string& challenge_hex,
     return result.load(std::memory_order_relaxed);
 }
 
-extern "C" {
-
-// Return: nonce >= 0 on success, -1 on not-found / invalid args,
-//         -2 on unsupported CPU (no AVX2).
-__attribute__((visibility("default")))
-int64_t ds_pow_solve(const char* base, size_t base_len,
-                     const char* challenge_hex, size_t hex_len,
-                     int64_t difficulty)
-{
-// #if !defined(POW_HAVE_AVX2) || !defined(__AVX2__)
-//     (void)base; (void)base_len; (void)challenge_hex; (void)hex_len;
-//     (void)difficulty;
-//     return -2;
-// #else
-//     if (!__builtin_cpu_supports("avx2"))
-//         return -2;
-    if (!base || !challenge_hex) return -1;
-    if (hex_len != 64) return -1;
-    std::string b(base, base_len);
-    std::string h(challenge_hex, hex_len);
-    return solve(b, h, difficulty);
-// #endif
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+__attribute__((target("avx2")))
+static int64_t solve_avx2(const std::string& base, const std::string& challenge_hex,
+                       int64_t difficulty) {
+    return solve_impl(base, challenge_hex, difficulty);
 }
+#endif
 
-// Optional: expose ABI version so the Python wrapper can refuse mismatched wheels.
-__attribute__((visibility("default")))
-int32_t ds_pow_abi_version(void) { return 1; }
+extern "C" int64_t solve(const char* base_cstr, const char* challenge_hex, int64_t difficulty) {
+    if (base_cstr == nullptr || challenge_hex == nullptr)
+        return -1;
 
-} // extern "C"
+    const std::string base(base_cstr);
+    const std::string challenge(challenge_hex);
 
-// PYBIND11_MODULE(_pow, m) {
-//     m.doc() = "C++ Keccak-based PoW solver for DeepSeek (23-round variant).";
-//     m.def("solve", &solve,
-//         py::arg("base"),
-//         py::arg("challenge_hex"),
-//         py::arg("difficulty"),
-//         "Brute-force a PoW nonce.\n\n"
-//         "Args:\n"
-//         "    base: Salt prefix string.\n"
-//         "    challenge_hex: Expected 32-byte digest as 64-char hex string.\n"
-//         "    difficulty: Maximum iterations.\n\n"
-//         "Returns:\n"
-//         "    Matching nonce >= 0, or -1 if not found."
-//     );
-// }
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+    __builtin_cpu_init();
+    if (__builtin_cpu_supports("avx2"))
+        return solve_avx2(base, challenge, difficulty);
+#endif
+
+    return -1;
+}
