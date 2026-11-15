@@ -19,7 +19,7 @@ HEADERS = {
     "Accept": "application/json",
     "User-Agent": "DeepSeek/2 CFNetwork/1568.100.1 Darwin/24.0.0",
     "x-client-platform": "ios",
-    "x-client-version": "2.0.4",
+    "x-client-version": "2.1.8",
     "x-client-bundle-id": "com.deepseek.chat",
     "x-client-locale": "en_US",
     "x-client-timezone-offset": "3600",

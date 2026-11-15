@@ -12,7 +12,7 @@ from aiodeepseek.types.exceptions import DeepSeekError, raise_for_api_response, 
 from aiodeepseek.types.models.classes import UploadedImage
 from aiodeepseek.clients.chat import _ChatClient
 
-from aiodeepseek.http._config import _DEV_MODE
+from aiodeepseek.http import _config
 
 _UPLOAD_PENDING_STATUSES: Set[str] = {"PENDING", "PROCESSING", "UPLOADING", "PARSING"}
 _UPLOAD_POLL_INTERVAL: float = 2
@@ -91,7 +91,7 @@ class _FilesClient(_ChatClient):
             meta = await self._fetch_file(token, file_id)
             status: str = meta.get("status", "")
 
-            if _DEV_MODE:
+            if _config._DEV_MODE:
                 _log.debug("file %s status=%r", file_id, status)
 
             if status not in _UPLOAD_PENDING_STATUSES:

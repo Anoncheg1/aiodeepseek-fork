@@ -2,7 +2,7 @@ import json
 from typing import AsyncIterator, Dict, Optional, Tuple
 
 from aiodeepseek.data.constants import BASE_URL, COMPLETION_PATH, HEADERS
-from aiodeepseek.http._config import _DEV_MODE
+from aiodeepseek.http import _config
 from aiodeepseek.http._sse import _coerce_message_id, _extract_fragment, _extract_message_id
 from aiodeepseek.log import _log, _log_request
 from aiodeepseek.types.enums import ModelType
@@ -84,7 +84,7 @@ class _ChatClient(_AuthClient):
                 headers=headers,
                 timeout=self._aiohttp_timeout(effective),
         ) as resp:
-            if _DEV_MODE:
+            if _config._DEV_MODE:
                 _log.debug("<<< STREAM CHAT RESPONSE  status=%s", resp.status)
                 _log.debug("    HEADERS:")
                 for k, v in resp.headers.items():
@@ -104,7 +104,7 @@ class _ChatClient(_AuthClient):
             async for raw_line in resp.content:
                 line: str = raw_line.decode("utf-8", errors="replace").strip()
 
-                if _DEV_MODE and line:
+                if _config._DEV_MODE and line:
                     _log.debug("SSE: %s", line)
 
                 if line.startswith("event:"):
@@ -157,5 +157,5 @@ class _ChatClient(_AuthClient):
                 else:
                     yield fragment, message_id
 
-        if _DEV_MODE:
+        if _config._DEV_MODE:
             _log.debug("stream done — final message_id=%r", message_id)

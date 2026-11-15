@@ -4,14 +4,14 @@ import base64
 import json
 import random
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 import aiohttp
 
 from aiodeepseek.data.constants import BASE_URL, COMPLETION_PATH, HEADERS
 from aiodeepseek.data.device_ids import get_device_id
-from aiodeepseek.http._config import _DEV_MODE
-from aiodeepseek.log import _log_request, _log_response
+from aiodeepseek.http import _config
+from aiodeepseek.log import _log_request, _log_response, _log_str
 from aiodeepseek.pow.pow import solve_pow
 from aiodeepseek.types.exceptions import DeepSeekError, raise_for_api_response
 from aiodeepseek.types.exceptions._classes import PowNotSolvedError
@@ -41,6 +41,7 @@ class _BaseClient:
         self._device_id: str = device_id or get_device_id()
         self._session: Optional[aiohttp.ClientSession] = None
         self._rangers_id: str = str(random.randint(10**18, 10**19 - 1))
+        self._validated_tokens: set[str] = set()
 
     def _aiohttp_timeout(self, timeout: Optional[float]) -> Optional[aiohttp.ClientTimeout]:
         """Convert a float *timeout* to ``aiohttp.ClientTimeout``, or ``None``."""
@@ -99,7 +100,7 @@ class _BaseClient:
         Raises:
             DeepSeekError: On non-200 HTTP status or a non-JSON response body.
         """
-        if _DEV_MODE:
+        if _config._DEV_MODE:
             raw = await resp.text()
             _log_response(label, resp.status, resp.headers, raw)
             if resp.status != 200:
@@ -117,6 +118,53 @@ class _BaseClient:
             except json.JSONDecodeError as exc:
                 raise DeepSeekError(f"{label} non-JSON response") from exc
 
+    async def _fetch_user_info(
+        self,
+        user_token: str,
+        timeout: Optional[float] = None,
+        *,
+        force: bool = False,
+    ) -> Dict[str, Any]:
+        """Call GET /api/v0/users/current, print user info, return biz_data.
+
+        Used for token validation + debugging. The server echoes the same
+        token back in `biz_data.token` — this is NOT a token exchange.
+        """
+        if not force and user_token in self._validated_tokens:
+            return {}  # already validated this run
+
+        assert self._session is not None, "Session not started"
+        effective = self._effective_timeout(timeout)
+        url = BASE_URL + "/api/v0/users/current"
+        req_headers = {**HEADERS, "Authorization": f"Bearer {user_token}"}
+
+        _log_request("FETCH USER INFO REQUEST", url, req_headers, None)
+
+        async with self._session.get(
+            url,
+            headers=req_headers,
+            timeout=self._aiohttp_timeout(effective),
+        ) as resp:
+            data = await self._read_json(resp, "FETCH USER INFO RESPONSE")
+
+        raise_for_api_response("fetch_user_info", data)
+
+        biz_data = data["data"]["biz_data"]
+
+        # ---- print to stdout --------------------------------------------
+        _log_str(
+            "[aiodeepseek] user info:"
+            f" id={biz_data.get('id')!r}"
+            f" email={biz_data.get('email')!r}"
+            f" status={biz_data.get('status')!r}"
+            f" minor_mode={biz_data.get('minor_mode_status')!r}"
+            f" need_birthday={biz_data.get('need_birthday')!r}"
+        )
+
+        self._validated_tokens.add(user_token)
+        return biz_data
+
+
     async def create_chat_session(
         self,
         token: str,
@@ -125,8 +173,8 @@ class _BaseClient:
         """Create a new DeepSeek chat session and return its id.
 
         Args:
-            token: Valid bearer token.
-            timeout: Per-call timeout override; falls back to the instance default.
+            token: Valid userToken (same one used for /users/current).
+            timeout: Per-call timeout override; falls back to instance default.
 
         Returns:
             Chat session id string.
@@ -135,10 +183,18 @@ class _BaseClient:
             DeepSeekError: If the API returns a non-zero status code.
         """
         assert self._session is not None, "Session not started"
+
+        # ---- validate token once and print user info --------------------
+        await self._fetch_user_info(token, timeout=timeout)
+
+        # ---- create session using the same token ------------------------
         effective = self._effective_timeout(timeout)
         url = BASE_URL + "/api/v0/chat_session/create"
-        req_headers: Dict[str, str] = {**HEADERS, "Authorization": f"Bearer {token}"}
-        req_body: Dict[str, int] = {"character_id": 1}
+        req_headers: Dict[str, str] = {
+            **HEADERS,
+            "Authorization": f"Bearer {token}",
+        }
+        req_body: Dict[str, int] = None # {"character_id": 1}
 
         _log_request("CREATE SESSION REQUEST", url, req_headers, req_body)
 
@@ -153,6 +209,44 @@ class _BaseClient:
         raise_for_api_response("create_session", data)
 
         return data["data"]["biz_data"]["chat_session"]["id"]
+
+
+    # async def create_chat_session(
+    #     self,
+    #     token: str,
+    #     timeout: Optional[float] = None,
+    # ) -> str:
+    #     """Create a new DeepSeek chat session and return its id.
+
+    #     Args:
+    #         token: Valid bearer token.
+    #         timeout: Per-call timeout override; falls back to the instance default.
+
+    #     Returns:
+    #         Chat session id string.
+
+    #     Raises:
+    #         DeepSeekError: If the API returns a non-zero status code.
+    #     """
+    #     assert self._session is not None, "Session not started"
+    #     effective = self._effective_timeout(timeout)
+    #     url = BASE_URL + "/api/v0/chat_session/create"
+    #     req_headers: Dict[str, str] = {**HEADERS, "Authorization": f"Bearer {token}"}
+    #     req_body: Dict[str, int] = {"character_id": 1}
+
+    #     _log_request("CREATE SESSION REQUEST", url, req_headers, req_body)
+
+    #     async with self._session.post(
+    #         url,
+    #         json=req_body,
+    #         headers=req_headers,
+    #         timeout=self._aiohttp_timeout(effective),
+    #     ) as resp:
+    #         data = await self._read_json(resp, "CREATE SESSION RESPONSE")
+
+    #     raise_for_api_response("create_session", data)
+
+    #     return data["data"]["biz_data"]["chat_session"]["id"]
 
     async def _get_pow_challenge(
         self,

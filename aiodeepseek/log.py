@@ -3,23 +3,27 @@ from __future__ import annotations
 import logging
 import sys
 
-from aiodeepseek.http._config import _DEV_MODE, _LOG_POW_TIME
+from aiodeepseek.http import _config
+# _DEV_MODE, _LOG_POW_TIME
 
 _log: logging.Logger = logging.getLogger("aiodeepseek")
 _log.propagate = False
 
-_handler: logging.Handler = logging.StreamHandler(sys.stdout)
-_handler.setFormatter(logging.Formatter("[DEV] %(message)s"))
+# Prevents "No handlers could be found for logger" warnings when unconfigured
+_log.addHandler(logging.NullHandler())
 
-if _DEV_MODE:
-    _handler.setLevel(logging.DEBUG)
-    _log.setLevel(logging.DEBUG)
-    _log.addHandler(_handler)
+# _handler: logging.Handler = logging.StreamHandler(sys.stdout)
+# _handler.setFormatter(logging.Formatter("[DEV] %(message)s"))
 
-elif _LOG_POW_TIME:
-    _handler.setLevel(logging.INFO)
-    _log.setLevel(logging.INFO)
-    _log.addHandler(_handler)
+# if _config._DEV_MODE:
+#     _handler.setLevel(logging.DEBUG)
+#     _log.setLevel(logging.DEBUG)
+#     _log.addHandler(_handler)
+
+# elif _config._LOG_POW_TIME:
+#     _handler.setLevel(logging.INFO)
+#     _log.setLevel(logging.INFO)
+#     _log.addHandler(_handler)
 
 def _log_str(msg: str) -> None:
     _log.info(msg)
@@ -33,7 +37,7 @@ def _log_request(label: str, url: str, headers: dict, body: object = None) -> No
         headers: Headers dict that will be emitted key-by-key.
         body: Optional body object printed with :func:`repr`.
     """
-    if not _DEV_MODE:
+    if not _config._DEV_MODE and not _log.isEnabledFor(logging.DEBUG):
         return
     _log.debug(">>> %s", label)
     _log.debug("    URL    : %s", url)
@@ -56,7 +60,7 @@ def _log_response(label: str, status: int, headers: object, raw: str) -> None:
         headers: Mapping of response headers (``aiohttp.CIMultiDictProxy`` or plain dict).
         raw: Raw response body string.
     """
-    if not _DEV_MODE:
+    if not _config._DEV_MODE and not _log.isEnabledFor(logging.DEBUG):
         return
     _log.debug("<<< %s  status=%s", label, status)
     _log.debug("    HEADERS:")

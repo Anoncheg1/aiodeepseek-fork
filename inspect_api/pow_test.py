@@ -39,43 +39,34 @@ async def solve_single_pow(client: DeepSeekClient, token: str, index: int):
     }
 
 
-async def main():
-    token = os.environ.get("DEEPSEEK_TOKEN")
-
+async def main(n_runs: int = 10) -> int:
+    token = os.environ["DEEPSEEK_TOKEN"]
     async with DeepSeekClient(token=token) as client:
-        tasks = [
-            solve_single_pow(client, token, i + 1)
-            for i in range(10)
-        ]
+        # warm-up: exclude from stats
+        await solve_single_pow(client, token, 0)
 
-        results = await asyncio.gather(*tasks)
-
-    times = []
-    difficulties = []
-
-    for result in results:
-        times.append(result["elapsed"])
-        difficulties.append(result["difficulty"])
-
-        print(
-            f"[{result['index']}] "
-            f"difficulty={result['difficulty']} "
-            f"nonce={result['nonce']} "
-            f"time={result['elapsed'] * 1000:.4f} ms"
+        results = await asyncio.gather(
+            *(solve_single_pow(client, token, i + 1) for i in range(n_runs)),
+            return_exceptions=True,
         )
 
-    unique_difficulties = sorted(set(difficulties))
+    errors = [r for r in results if isinstance(r, BaseException)]
+    ok = [r for r in results if not isinstance(r, BaseException)]
 
-    if len(unique_difficulties) == 1:
-        diff_output = str(unique_difficulties[0])
-    else:
-        diff_output = " ".join(map(str, unique_difficulties))
+    for e in errors:
+        print(f"FAILED: {e!r}")
+    if not ok:
+        return 1
 
-    print()
-    print(f"Difficulties: {diff_output}")
-    print(f"Average time: {statistics.mean(times) * 1000:.4f} ms")
-    print(f"Min time: {min(times) * 1000:.4f} ms")
-    print(f"Max time: {max(times) * 1000:.4f} ms")
+    for r in ok:
+        print(f"[{r['index']}] difficulty={r['difficulty']} "
+              f"nonce={r['nonce']!s:.16}… time={r['elapsed']*1000:.4f} ms")
+
+    times = [r["elapsed"] for r in ok]
+    print(f"\nRuns: {len(ok)}  Failures: {len(errors)}")
+    print(f"Average solve_pow: {statistics.mean(times)*1000:.4f} ms")
+    print(f"Min: {min(times)*1000:.4f} ms   Max: {max(times)*1000:.4f} ms")
+    return 0
 
 if __name__ == "__main__":
     asyncio.run(main())

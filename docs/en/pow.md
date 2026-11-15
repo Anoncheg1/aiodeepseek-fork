@@ -37,6 +37,12 @@ That means up to 144,000 Keccak-256 hashes may need to be computed in the worst 
 
 ## Performance
 
+### Linux simple compilation
+
+```bash
+g++ -O3 -Wall -shared -std=c++17 -fPIC $(python3 -m pybind11 --includes) _pow.cpp -o _pow$(python3-config --extension-suffix)
+```
+
 ### C++ extension
 
 The calculations are implemented in `aiodeepseek/pow/_pow.cpp` - C++17 using:

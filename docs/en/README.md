@@ -167,6 +167,27 @@ async def main():
 asyncio.run(main())
 ```
 
+## Logging
+
+```python
+import logging
+import aiodeepseek
+import aiodeepseek.http._config
+
+# 1. Enable dev mode so request/response hooks trigger
+aiodeepseek.http._config._DEV_MODE = True
+
+# 2. Configure standard Python logging however you want (e.g., write to a file)
+logger = logging.getLogger("aiodeepseek")
+logger.setLevel(logging.DEBUG)
+
+handler = logging.FileHandler("my_app_debug.log", encoding="utf-8")
+# OR
+# handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter("[AIODEEPSEEK] %(asctime)s - %(levelname)s - %(message)s"))
+logger.addHandler(handler)
+```
+
 ---
 
 ## Proof-of-Work

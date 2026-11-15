@@ -15,13 +15,20 @@ def _extra_compile_args() -> List[str]:
             "/arch:AVX2",
         ]
 
-    return [
+
+    ret = [
         "-std=c++17",
         "-O3",
         "-mavx2",
         "-march=native",
         "-flto",
+        "-fvisibility=hidden"
     ]
+
+    if sys.platform == "darwin":
+        ret += ["-stdlib=libc++"]
+
+    return ret
 
 
 def _extra_link_args() -> List[str]:
@@ -35,21 +42,29 @@ def _extra_link_args() -> List[str]:
     ]
 
 
-def _build_ext() -> Extension:
-    import pybind11
+# def _build_ext() -> Extension:
+#     import pybind11
 
-    return Extension(
-        "aiodeepseek.pow._pow",
-        sources=["aiodeepseek/pow/_pow.cpp"],
-        include_dirs=[pybind11.get_include()],
-        language="c++",
-        extra_compile_args=_extra_compile_args(),
-        extra_link_args=_extra_link_args(),
-    )
+#     return Extension(
+#         "aiodeepseek.pow._pow",
+#         sources=["aiodeepseek/pow/_pow.cpp"],
+#         include_dirs=[pybind11.get_include()],
+#         language="c++",
+#         extra_compile_args=_extra_compile_args(),
+#         extra_link_args=_extra_link_args(),
+#     )
 
 
 setup(
-    ext_modules=[_build_ext()],
+    # ext_modules=[_build_ext()],
+    ext_modules=[
+        Extension(
+            "aiodeepseek.pow._pow_c",
+            sources=["aiodeepseek/pow/_pow.cpp"],
+            language="c++",
+            extra_compile_args=_extra_compile_args(),
+        )
+    ],
     package_data={
         "aiodeepseek.pow": ["*.pyi"],
     },

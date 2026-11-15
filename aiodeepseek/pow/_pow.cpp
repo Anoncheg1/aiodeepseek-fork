@@ -1,4 +1,4 @@
-#include <pybind11/pybind11.h>
+// #include <pybind11/pybind11.h>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -6,9 +6,13 @@
 #include <thread>
 #include <vector>
 #include <algorithm>
-#include <immintrin.h>
+// #include <immintrin.h>
+#if defined(__x86_64__) || defined(_M_X64)
+#  include <immintrin.h>
+#  define POW_HAVE_AVX2 1
+#endif
 
-namespace py = pybind11;
+// namespace py = pybind11;
 
 static constexpr size_t RATE = 136;
 static constexpr size_t RATE_W = RATE / 8;
@@ -310,18 +314,48 @@ static int64_t solve(const std::string& base, const std::string& challenge_hex,
     return result.load(std::memory_order_relaxed);
 }
 
-PYBIND11_MODULE(_pow, m) {
-    m.doc() = "C++ Keccak-based PoW solver for DeepSeek (23-round variant).";
-    m.def("solve", &solve,
-        py::arg("base"),
-        py::arg("challenge_hex"),
-        py::arg("difficulty"),
-        "Brute-force a PoW nonce.\n\n"
-        "Args:\n"
-        "    base: Salt prefix string.\n"
-        "    challenge_hex: Expected 32-byte digest as 64-char hex string.\n"
-        "    difficulty: Maximum iterations.\n\n"
-        "Returns:\n"
-        "    Matching nonce >= 0, or -1 if not found."
-    );
+extern "C" {
+
+// Return: nonce >= 0 on success, -1 on not-found / invalid args,
+//         -2 on unsupported CPU (no AVX2).
+__attribute__((visibility("default")))
+int64_t ds_pow_solve(const char* base, size_t base_len,
+                     const char* challenge_hex, size_t hex_len,
+                     int64_t difficulty)
+{
+// #if !defined(POW_HAVE_AVX2) || !defined(__AVX2__)
+//     (void)base; (void)base_len; (void)challenge_hex; (void)hex_len;
+//     (void)difficulty;
+//     return -2;
+// #else
+//     if (!__builtin_cpu_supports("avx2"))
+//         return -2;
+    if (!base || !challenge_hex) return -1;
+    if (hex_len != 64) return -1;
+    std::string b(base, base_len);
+    std::string h(challenge_hex, hex_len);
+    return solve(b, h, difficulty);
+// #endif
 }
+
+// Optional: expose ABI version so the Python wrapper can refuse mismatched wheels.
+__attribute__((visibility("default")))
+int32_t ds_pow_abi_version(void) { return 1; }
+
+} // extern "C"
+
+// PYBIND11_MODULE(_pow, m) {
+//     m.doc() = "C++ Keccak-based PoW solver for DeepSeek (23-round variant).";
+//     m.def("solve", &solve,
+//         py::arg("base"),
+//         py::arg("challenge_hex"),
+//         py::arg("difficulty"),
+//         "Brute-force a PoW nonce.\n\n"
+//         "Args:\n"
+//         "    base: Salt prefix string.\n"
+//         "    challenge_hex: Expected 32-byte digest as 64-char hex string.\n"
+//         "    difficulty: Maximum iterations.\n\n"
+//         "Returns:\n"
+//         "    Matching nonce >= 0, or -1 if not found."
+//     );
+// }
