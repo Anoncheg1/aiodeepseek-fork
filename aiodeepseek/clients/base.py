@@ -53,12 +53,11 @@ class _BaseClient:
 
     def _base_headers(self) -> Dict[str, str]:
         """Return request headers extended with dynamic per-instance values."""
-        offset = -time.timezone if time.daylight == 0 else -time.altzone
+        # offset = -time.timezone if time.daylight == 0 else -time.altzone
         return {
             **HEADERS,
             "x-rangers-id": self._rangers_id,
-            "x-client-timezone-offset": str(offset),
-        }
+        } # "x-client-timezone-offset": str(offset),
 
     async def open(self) -> None:
         """Open the underlying ``aiohttp.ClientSession``."""
@@ -272,6 +271,10 @@ class _BaseClient:
         effective = self._effective_timeout(timeout)
         url = BASE_URL + "/api/v0/chat/create_pow_challenge"
         req_headers: Dict[str, str] = {**HEADERS, "Authorization": f"Bearer {token}"}
+        if self._device_id:
+            req_headers["x-device-id"] = self._device_id
+            req_headers["x-device-model"] = ""
+
         req_body: Dict[str, str] = {"target_path": target_path}
 
         _log_request("POW CHALLENGE REQUEST", url, req_headers, req_body)

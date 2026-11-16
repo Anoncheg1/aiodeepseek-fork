@@ -9,10 +9,13 @@ UPLOAD_PATH: str = "/api/v0/file/upload_file"
 HEADERS: Dict[str, str] = {
     "Content-Type": "application/json",
     "Accept": "application/json",
-    "User-Agent": "DeepSeek/2 CFNetwork/1568.100.1 Darwin/24.0.0",
+    "User-Agent": "DeepSeek/2 CFNetwork/3826.400.12 Darwin/24.3.0",
     "x-client-platform": "ios",
-    "x-client-version": "2.1.8",
+    "x-client-version": "2.8.0",
     "x-client-bundle-id": "com.deepseek.chat",
     "x-client-locale": "en_US",
-    "x-client-timezone-offset": "3600",
+    "x-client-timezone-offset": "0",
+    "Origin": "https://chat.deepseek.com",
+    "Priority": "u=0",
+    "Referer": "https://chat.deepseek.com/",
 }

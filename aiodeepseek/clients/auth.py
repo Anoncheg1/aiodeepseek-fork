@@ -17,12 +17,11 @@ _REGISTER_PATH: str = "/api/v0/users/register"
 
 
 def _make_guest_headers() -> Dict[str, str]:
-    offset = -time.timezone if time.daylight == 0 else -time.altzone
+    # offset = -time.timezone if time.daylight == 0 else -time.altzone
     return {
         **HEADERS,
         "x-rangers-id": str(random.randint(10**18, 10**19 - 1)),
-        "x-client-timezone-offset": str(offset),
-    }
+    } # "x-client-timezone-offset": str(offset),
 
 
 class _AuthClient(_BaseClient):

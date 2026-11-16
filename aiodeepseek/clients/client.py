@@ -39,7 +39,7 @@ class DeepSeekClient(_FilesClient):
         email: Optional[str] = None,
         password: Optional[str] = None,
         token: Optional[str] = None,
-        model: ModelType = ModelType.DEFAULT,
+        model: ModelType = ModelType.DEFAULT.value, # API error for None, todo
         device_id: Optional[str] = None,
         timeout: Optional[float] = None,
     ) -> None:

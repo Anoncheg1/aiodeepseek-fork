@@ -198,3 +198,11 @@ Before every request, the client automatically solves the PoW challenge issued b
 - Python 3.9+
 - `aiohttp >= 3.9`
 - A C++17 compiler with AVX2 (to build the extension) or manually downloaded wheels.
+
+## Other similar projects
+
+https://github.com/sums001/Deepseek-API
+
+Require:
+- Python `wasmtime` wheel package, and some other Python packages
+- Browser automation environment: Playwright

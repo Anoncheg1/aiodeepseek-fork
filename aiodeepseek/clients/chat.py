@@ -19,7 +19,7 @@ class _ChatClient(_AuthClient):
             token: str,
             session_id: str,
             prompt: str,
-            model: ModelType = ModelType.DEFAULT,
+            model: ModelType = None, # ModelType.DEFAULT.value,
             timeout: Optional[float] = None,
             parent_message_id: Optional[str] = None,
             image: Optional[UploadedImage] = None,
@@ -58,8 +58,13 @@ class _ChatClient(_AuthClient):
             **HEADERS,
             "Authorization": f"Bearer {token}",
             "Accept": "text/event-stream",
-            "X-DS-PoW-Response": pow_header,
+            "x-ds-pow-response": pow_header,
         }
+
+        if self._device_id:
+            headers["x-device-id"] = self._device_id
+            headers["x-device-model"] = ""
+
 
         body: Dict = {
             "chat_session_id": session_id,
@@ -67,8 +72,9 @@ class _ChatClient(_AuthClient):
             "prompt": prompt,
             "ref_file_ids": [image.file_id] if image is not None else [],
             "thinking_enabled": False,
-            "search_enabled": False,
-            "audio_id": None,
+            "search_enabled": True,
+            # "audio_id": None,
+            "action": None,
             "preempt": False,
             "model_type": model,
         }

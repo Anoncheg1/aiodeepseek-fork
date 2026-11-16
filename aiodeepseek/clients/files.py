@@ -155,8 +155,8 @@ class _FilesClient(_ChatClient):
             **base_headers,
             "Accept": "application/json",
             "Authorization": f"Bearer {token}",
-            "X-DS-PoW-Response": pow_header,
-            "X-Thinking-Enabled": "0",
+            "x-ds-pow-response": pow_header,
+            "x-thinking-enabled": "0",
             "x-file-size": str(len(data)),
             "x-model-type": model,
         }
