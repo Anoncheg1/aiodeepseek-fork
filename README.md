@@ -199,6 +199,13 @@ Before every request, the client automatically solves the PoW challenge issued b
 - `aiohttp >= 3.9`
 - A C++17 compiler with AVX2 (to build the extension) or manually downloaded wheels.
 
+## How chat works
+1) /api/v0/chat_session/create in ./aiodeepseek/clients/base.py
+
+2) /api/v0/chat/create_pow_challenge
+
+3) /api/v0/chat/completion
+
 ## Other similar projects
 
 https://github.com/sums001/Deepseek-API
@@ -206,3 +213,6 @@ https://github.com/sums001/Deepseek-API
 Require:
 - Python `wasmtime` wheel package, and some other Python packages
 - Browser automation environment: Playwright
+
+
+https://github.com/cheaper-inference/OmniRoute/blob/997ece8ef0b59e438e41036641a5230311d848db/.omo/deepseek-web-integration/RESEARCH_DISCOVERY.md#1

@@ -70,7 +70,10 @@ class DeepSeekClient(_FilesClient):
                 self._device_id,
             )
 
-        self._session_id = await self.create_chat_session(self._token)
+        # ---- validate token once and print user info --------------------
+        await self._fetch_user_info(self.token, timeout=timeout)
+        # ---- get chat_session_id
+        self._session_id = await self.create_chat_session()
 
     async def __aenter__(self) -> "DeepSeekClient":
         await self.open()

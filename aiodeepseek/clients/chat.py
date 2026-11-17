@@ -98,6 +98,7 @@ class _ChatClient(_AuthClient):
 
             if resp.status != 200:
                 raw = await resp.text()
+                _log.debug("SSE HTTP. Error code: %s. Error message: %s", resp.status, raw[:400])
                 _log.debug("    BODY:")
                 _log.debug("%s", raw)
                 raise DeepSeekError(

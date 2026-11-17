@@ -51,14 +51,6 @@ class _BaseClient:
         """Return *timeout* when given, otherwise fall back to the instance default."""
         return timeout if timeout is not None else self._timeout
 
-    def _base_headers(self) -> Dict[str, str]:
-        """Return request headers extended with dynamic per-instance values."""
-        # offset = -time.timezone if time.daylight == 0 else -time.altzone
-        return {
-            **HEADERS,
-            "x-rangers-id": self._rangers_id,
-        } # "x-client-timezone-offset": str(offset),
-
     async def open(self) -> None:
         """Open the underlying ``aiohttp.ClientSession``."""
         self._session = aiohttp.ClientSession(
@@ -136,6 +128,9 @@ class _BaseClient:
         effective = self._effective_timeout(timeout)
         url = BASE_URL + "/api/v0/users/current"
         req_headers = {**HEADERS, "Authorization": f"Bearer {user_token}"}
+        if self._device_id:
+            req_headers["x-device-id"] = self._device_id
+            req_headers["x-device-model"] = ""
 
         _log_request("FETCH USER INFO REQUEST", url, req_headers, None)
 
@@ -166,10 +161,9 @@ class _BaseClient:
 
     async def create_chat_session(
         self,
-        token: str,
         timeout: Optional[float] = None,
     ) -> str:
-        """Create a new DeepSeek chat session and return its id.
+        """Initialize a DeepSeek chat session and return its id.
 
         Args:
             token: Valid userToken (same one used for /users/current).
@@ -183,16 +177,16 @@ class _BaseClient:
         """
         assert self._session is not None, "Session not started"
 
-        # ---- validate token once and print user info --------------------
-        await self._fetch_user_info(token, timeout=timeout)
-
         # ---- create session using the same token ------------------------
         effective = self._effective_timeout(timeout)
         url = BASE_URL + "/api/v0/chat_session/create"
         req_headers: Dict[str, str] = {
             **HEADERS,
-            "Authorization": f"Bearer {token}",
+            "Authorization": f"Bearer {self.token}",
         }
+        if self._device_id:
+            req_headers["x-device-id"] = self._device_id
+            req_headers["x-device-model"] = ""
         req_body: Dict[str, int] = None # {"character_id": 1}
 
         _log_request("CREATE SESSION REQUEST", url, req_headers, req_body)
@@ -209,43 +203,52 @@ class _BaseClient:
 
         return data["data"]["biz_data"]["chat_session"]["id"]
 
+    async def create_chat_session_spec(
+        self,
+        timeout: Optional[float] = None,
+    ) -> str:
+        """Create a new chat conversation via POST /api/v0/chat/conversations
+        and assign it to self._session_id.
+        Enforce a new chat, when parent_message_id should set to None.
 
-    # async def create_chat_session(
-    #     self,
-    #     token: str,
-    #     timeout: Optional[float] = None,
-    # ) -> str:
-    #     """Create a new DeepSeek chat session and return its id.
+        Args:
+            token: Valid userToken (same one used for /users/current).
+            timeout: Per-call timeout override; falls back to instance default.
+        Returns:
+            Chat session/conversation id string.
+        Raises:
+            DeepSeekError: If the API returns a non-zero status code.
+        """
+        assert self._session is not None, "Session not started"
 
-    #     Args:
-    #         token: Valid bearer token.
-    #         timeout: Per-call timeout override; falls back to the instance default.
+        # ---- validate token once and print user info --------------------
+        await self._fetch_user_info(self.token, timeout=timeout)
 
-    #     Returns:
-    #         Chat session id string.
+        # ---- create session using the same token ------------------------
+        effective = self._effective_timeout(timeout)
+        url = BASE_URL + "/api/v0/chat/conversations"
+        req_headers: Dict[str, str] = {
+            **HEADERS,
+            "Authorization": f"Bearer {self.token}",
+        }
+        if self._device_id:
+            req_headers["x-device-id"] = self._device_id
+            req_headers["x-device-model"] = ""
 
-    #     Raises:
-    #         DeepSeekError: If the API returns a non-zero status code.
-    #     """
-    #     assert self._session is not None, "Session not started"
-    #     effective = self._effective_timeout(timeout)
-    #     url = BASE_URL + "/api/v0/chat_session/create"
-    #     req_headers: Dict[str, str] = {**HEADERS, "Authorization": f"Bearer {token}"}
-    #     req_body: Dict[str, int] = {"character_id": 1}
+        req_body: Dict[str, int] = None # {"character_id": 1}
 
-    #     _log_request("CREATE SESSION REQUEST", url, req_headers, req_body)
+        _log_request("CREATE SESSION-SPEC REQUEST", url, req_headers, req_body)
 
-    #     async with self._session.post(
-    #         url,
-    #         json=req_body,
-    #         headers=req_headers,
-    #         timeout=self._aiohttp_timeout(effective),
-    #     ) as resp:
-    #         data = await self._read_json(resp, "CREATE SESSION RESPONSE")
+        async with self._session.post(
+            url,
+            json=req_body,
+            headers=req_headers,
+            timeout=self._aiohttp_timeout(effective),
+        ) as resp:
+            _log_str(f"create_session-spec: {resp}")
 
-    #     raise_for_api_response("create_session", data)
-
-    #     return data["data"]["biz_data"]["chat_session"]["id"]
+        self._session_id = await self.create_chat_session(timeout=timeout)
+        _log_str(f"set self._session_id to {self._session_id}")
 
     async def _get_pow_challenge(
         self,
